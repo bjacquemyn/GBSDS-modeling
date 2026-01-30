@@ -1,0 +1,53 @@
+# Clinical Scenario Presets for GBS Disability Distributions
+# All values are percentages (must sum to 100)
+
+presets:
+  severe_gbs:
+    name: "Severe GBS (Literature Default)"
+    description: "Based on typical severe GBS cohort outcomes at 4 weeks"
+    proportions:
+      - 0.0   # 0: Healthy
+      - 4.0   # 1: Minor Symptoms
+      - 4.0   # 2: Walk Independent
+      - 16.0  # 3: Walk Assisted
+      - 43.0  # 4: Bedridden
+      - 33.0  # 5: Ventilated
+    source: "Hughes et al., Cochrane Review"
+
+  moderate_gbs:
+    name: "Moderate GBS"
+    description: "Moderate severity with some preserved mobility"
+    proportions:
+      - 2.0   # 0: Healthy
+      - 8.0   # 1: Minor Symptoms
+      - 12.0  # 2: Walk Independent
+      - 28.0  # 3: Walk Assisted
+      - 35.0  # 4: Bedridden
+      - 15.0  # 5: Ventilated
+    source: "Estimated"
+
+  mild_gbs:
+    name: "Mild GBS"
+    description: "Milder presentation with higher baseline function"
+    proportions:
+      - 5.0   # 0: Healthy
+      - 15.0  # 1: Minor Symptoms
+      - 20.0  # 2: Walk Independent
+      - 30.0  # 3: Walk Assisted
+      - 22.0  # 4: Bedridden
+      - 8.0   # 5: Ventilated
+    source: "Estimated"
+
+  igos_baseline:
+    name: "IGOS Registry Baseline"
+    description: "Based on International GBS Outcome Study data"
+    proportions:
+      - 0.0   # 0: Healthy
+      - 2.0   # 1: Minor Symptoms
+      - 6.0   # 2: Walk Independent
+      - 18.0  # 3: Walk Assisted
+      - 44.0  # 4: Bedridden
+      - 30.0  # 5: Ventilated
+    source: "IGOS Consortium"
+
+default_preset: severe_gbs

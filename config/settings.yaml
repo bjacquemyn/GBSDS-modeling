@@ -1,0 +1,40 @@
+# GBS Clinical Trial Modeler Configuration
+
+app:
+  title: "GBS Clinical Trial Outcome Modeler"
+  subtitle: "Dynamic modeling using the Proportional Odds Model"
+  layout: "wide"
+
+disability_scale:
+  labels:
+    - "0: Healthy"
+    - "1: Minor Symptoms"
+    - "2: Walk Independent"
+    - "3: Walk Assisted"
+    - "4: Bedridden"
+    - "5: Ventilated"
+  short_labels:
+    - "0"
+    - "1"
+    - "2"
+    - "3"
+    - "4"
+    - "5"
+  walking_cutoff: 2  # Score <= this is considered "walking independent"
+
+simulation:
+  or_min: 0.5
+  or_max: 5.0
+  or_default: 1.5
+  or_step: 0.1
+  
+goal_seeking:
+  target_min: 1.0
+  target_max: 50.0
+  target_default: 20.0
+  target_step: 0.5
+
+export:
+  csv_enabled: true
+  excel_enabled: true
+  chart_png_enabled: true
