@@ -1,7 +1,7 @@
 """
 Uncertainty Propagation - Monte Carlo Simulation
 
-Simulate realistic uncertainty in both baseline distribution and odds ratio,
+Simulate realistic uncertainty in both control arm distribution and odds ratio,
 then observe how this propagates to outcome metrics.
 """
 
@@ -22,7 +22,7 @@ from src.components.sidebar import load_settings
 
 def sample_dirichlet(expected_props: np.ndarray, concentration: float, n_samples: int) -> np.ndarray:
     """
-    Sample baseline distributions from a Dirichlet distribution.
+    Sample control arm distributions from a Dirichlet distribution.
     
     Args:
         expected_props: Expected proportions (should sum to 100)
@@ -60,9 +60,9 @@ def sample_lognormal_or(expected_or: float, cv: float, n_samples: int) -> np.nda
 
 
 def run_simulation(
-    baseline_props: np.ndarray,
+    control_props: np.ndarray,
     expected_or: float,
-    baseline_concentration: float,
+    control_concentration: float,
     or_cv: float,
     n_simulations: int,
     walking_cutoff: int = 2
@@ -72,22 +72,22 @@ def run_simulation(
     
     Returns dict with simulation results.
     """
-    # Sample baselines and ORs
-    baseline_samples = sample_dirichlet(baseline_props, baseline_concentration, n_simulations)
+    # Sample control arms and ORs
+    control_samples = sample_dirichlet(control_props, control_concentration, n_simulations)
     or_samples = sample_lognormal_or(expected_or, or_cv, n_simulations)
     
     # Track outcomes
-    baseline_walking_rates = []
+    control_walking_rates = []
     treatment_walking_rates = []
     risk_differences = []
     treatment_proportions = []  # Track full treatment distributions
     
     for i in range(n_simulations):
         try:
-            model = ProportionalOddsModel(baseline_samples[i], walking_cutoff=walking_cutoff)
+            model = ProportionalOddsModel(control_samples[i], walking_cutoff=walking_cutoff)
             result = model.calculate_shift(or_samples[i])
             
-            baseline_walking_rates.append(model.baseline_walking_rate)
+            control_walking_rates.append(model.control_walking_rate)
             treatment_walking_rates.append(result.new_walking)
             risk_differences.append(result.risk_difference)
             treatment_proportions.append(result.new_proportions)
@@ -96,9 +96,9 @@ def run_simulation(
             continue
     
     return {
-        "baseline_samples": baseline_samples,
+        "control_samples": control_samples,
         "or_samples": or_samples,
-        "baseline_walking": np.array(baseline_walking_rates),
+        "control_walking": np.array(control_walking_rates),
         "treatment_walking": np.array(treatment_walking_rates),
         "risk_difference": np.array(risk_differences),
         "treatment_proportions": np.array(treatment_proportions),
@@ -171,12 +171,12 @@ def create_or_distribution_plot(data: np.ndarray, expected_or: float) -> go.Figu
     return fig
 
 
-def create_waterfall_uncertainty(results: dict, baseline_props: np.ndarray, expected_or: float) -> go.Figure:
+def create_waterfall_uncertainty(results: dict, control_props: np.ndarray, expected_or: float) -> go.Figure:
     """Create a visualization showing uncertainty contributions."""
     
     # Calculate deterministic result (no uncertainty)
     try:
-        deterministic_model = ProportionalOddsModel(baseline_props)
+        deterministic_model = ProportionalOddsModel(control_props)
         deterministic_result = deterministic_model.calculate_shift(expected_or)
         deterministic_rd = deterministic_result.risk_difference
     except:
@@ -217,26 +217,26 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
     from statsmodels.nonparametric.smoothers_lowess import lowess
     
     fig = make_subplots(rows=1, cols=2, 
-                        subplot_titles=("Impact of Baseline Severity", "Impact of Odds Ratio"),
+                        subplot_titles=("Impact of Control Arm Severity", "Impact of Odds Ratio"),
                         horizontal_spacing=0.15)
     
     # Get data aligned
     or_values = results["or_samples"][:len(results["risk_difference"])]
-    baseline_walking = results["baseline_walking"]
+    control_walking = results["control_walking"]
     risk_diff = results["risk_difference"]
     
     # Color scales
     or_colorscale = [[0, '#2ecc71'], [0.5, '#f1c40f'], [1, '#e74c3c']]
-    baseline_colorscale = [[0, '#e74c3c'], [0.5, '#f1c40f'], [1, '#2ecc71']]
+    control_colorscale = [[0, '#e74c3c'], [0.5, '#f1c40f'], [1, '#2ecc71']]
     
     # Number of bins for grouping
     n_bins = 6
     
-    # --- Left plot: Baseline walking vs Risk Difference, binned by OR ---
+    # --- Left plot: Control arm walking vs Risk Difference, binned by OR ---
     # Add scatter points first (background layer)
     fig.add_trace(
         go.Scatter(
-            x=baseline_walking,
+            x=control_walking,
             y=risk_diff,
             mode='markers',
             marker=dict(
@@ -268,7 +268,7 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
         if np.sum(mask) < 50:  # Need enough points for LOWESS
             continue
             
-        x_bin = baseline_walking[mask]
+        x_bin = control_walking[mask]
         y_bin = risk_diff[mask]
         or_bin_mean = np.mean(or_values[mask])
         
@@ -306,7 +306,7 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
                     text=[None] * (len(x_smooth) - 1) + [f"OR={or_bin_mean:.1f}"],
                     textposition='top right',
                     textfont=dict(size=10, color=line_color, family='Arial Black'),
-                    hovertemplate=f"OR bin: {or_bin_mean:.2f}<br>Baseline: %{{x:.1f}}%<br>RD: %{{y:.1f}}%<extra></extra>",
+                    hovertemplate=f"OR bin: {or_bin_mean:.2f}<br>Control: %{{x:.1f}}%<br>RD: %{{y:.1f}}%<extra></extra>",
                     showlegend=False
                 ),
                 row=1, col=1
@@ -314,7 +314,7 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
         except Exception:
             pass  # Skip if LOWESS fails
     
-    # --- Right plot: OR vs Risk Difference, binned by Baseline Walking ---
+    # --- Right plot: OR vs Risk Difference, binned by Control Walking ---
     # Add scatter points first (background layer)
     fig.add_trace(
         go.Scatter(
@@ -324,12 +324,12 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
             marker=dict(
                 size=3,
                 opacity=0.3,
-                color=baseline_walking,
-                colorscale=baseline_colorscale,
-                cmin=np.min(baseline_walking),
-                cmax=np.max(baseline_walking),
+                color=control_walking,
+                colorscale=control_colorscale,
+                cmin=np.min(control_walking),
+                cmax=np.max(control_walking),
                 colorbar=dict(
-                    title="Baseline<br>Walking %",
+                    title="Control<br>Walking %",
                     x=1.02,
                     len=0.8,
                     thickness=15
@@ -341,18 +341,18 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
         row=1, col=2
     )
     
-    # Bin by baseline walking and fit LOWESS curves
-    baseline_percentiles = np.percentile(baseline_walking, np.linspace(0, 100, n_bins + 1))
-    baseline_bin_indices = np.digitize(baseline_walking, baseline_percentiles[1:-1])
+    # Bin by control walking and fit LOWESS curves
+    control_percentiles = np.percentile(control_walking, np.linspace(0, 100, n_bins + 1))
+    control_bin_indices = np.digitize(control_walking, control_percentiles[1:-1])
     
     for bin_idx in range(n_bins):
-        mask = baseline_bin_indices == bin_idx
+        mask = control_bin_indices == bin_idx
         if np.sum(mask) < 50:  # Need enough points for LOWESS
             continue
             
         x_bin = or_values[mask]
         y_bin = risk_diff[mask]
-        baseline_bin_mean = np.mean(baseline_walking[mask])
+        control_bin_mean = np.mean(control_walking[mask])
         
         # Sort by x for LOWESS
         sort_idx = np.argsort(x_bin)
@@ -365,17 +365,17 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
             x_smooth = lowess_result[:, 0]
             y_smooth = lowess_result[:, 1]
             
-            # Get color for this bin (interpolate on baseline scale - reversed: high = green)
-            baseline_norm = (baseline_bin_mean - np.min(baseline_walking)) / (np.max(baseline_walking) - np.min(baseline_walking))
+            # Get color for this bin (interpolate on control scale - reversed: high = green)
+            control_norm = (control_bin_mean - np.min(control_walking)) / (np.max(control_walking) - np.min(control_walking))
             # Interpolate RGB from red -> yellow -> green (reversed)
-            if baseline_norm < 0.5:
-                r = int(231 + (241 - 231) * (baseline_norm * 2))
-                g = int(76 + (196 - 76) * (baseline_norm * 2))
-                b = int(60 + (15 - 60) * (baseline_norm * 2))
+            if control_norm < 0.5:
+                r = int(231 + (241 - 231) * (control_norm * 2))
+                g = int(76 + (196 - 76) * (control_norm * 2))
+                b = int(60 + (15 - 60) * (control_norm * 2))
             else:
-                r = int(241 + (46 - 241) * ((baseline_norm - 0.5) * 2))
-                g = int(196 + (204 - 196) * ((baseline_norm - 0.5) * 2))
-                b = int(15 + (113 - 15) * ((baseline_norm - 0.5) * 2))
+                r = int(241 + (46 - 241) * ((control_norm - 0.5) * 2))
+                g = int(196 + (204 - 196) * ((control_norm - 0.5) * 2))
+                b = int(15 + (113 - 15) * ((control_norm - 0.5) * 2))
             line_color = f'rgb({r},{g},{b})'
             
             fig.add_trace(
@@ -384,11 +384,11 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
                     y=y_smooth,
                     mode='lines+text',
                     line=dict(width=3, color=line_color),
-                    name=f"Baseline ≈ {baseline_bin_mean:.1f}%",
-                    text=[None] * (len(x_smooth) - 1) + [f"{baseline_bin_mean:.0f}%"],
+                    name=f"Control ≈ {control_bin_mean:.1f}%",
+                    text=[None] * (len(x_smooth) - 1) + [f"{control_bin_mean:.0f}%"],
                     textposition='top right',
                     textfont=dict(size=10, color=line_color, family='Arial Black'),
-                    hovertemplate=f"Baseline bin: {baseline_bin_mean:.1f}%<br>OR: %{{x:.2f}}<br>RD: %{{y:.1f}}%<extra></extra>",
+                    hovertemplate=f"Control bin: {control_bin_mean:.1f}%<br>OR: %{{x:.2f}}<br>RD: %{{y:.1f}}%<extra></extra>",
                     showlegend=False
                 ),
                 row=1, col=2
@@ -396,7 +396,7 @@ def create_scatter_sensitivity(results: dict) -> go.Figure:
         except Exception:
             pass  # Skip if LOWESS fails
     
-    fig.update_xaxes(title_text="Baseline Walking Rate (%)", row=1, col=1)
+    fig.update_xaxes(title_text="Control Walking Rate (%)", row=1, col=1)
     fig.update_xaxes(title_text="Odds Ratio", row=1, col=2)
     fig.update_yaxes(title_text="Risk Difference (%)", row=1, col=1)
     fig.update_yaxes(title_text="Risk Difference (%)", row=1, col=2)
@@ -454,9 +454,9 @@ def create_success_probability_plot(results: dict, thresholds: list) -> go.Figur
     return fig
 
 
-def create_uncertainty_grotta(results: dict, baseline_props: np.ndarray, labels: list) -> go.Figure:
+def create_uncertainty_grotta(results: dict, control_props: np.ndarray, labels: list) -> go.Figure:
     """
-    Create a Grotta bar chart showing baseline vs treatment with uncertainty bands.
+    Create a Grotta bar chart showing control vs treatment with uncertainty bands.
     
     Uses coherent distributions from specific simulations that produced
     the 5th, 50th (median), and 95th percentile risk differences.
@@ -490,9 +490,9 @@ def create_uncertainty_grotta(results: dict, baseline_props: np.ndarray, labels:
     treatment_at_50 = results["treatment_proportions"][idx_50]
     treatment_at_95 = results["treatment_proportions"][idx_95]
     
-    baseline_at_5 = results["baseline_samples"][idx_5]
-    baseline_at_50 = results["baseline_samples"][idx_50]
-    baseline_at_95 = results["baseline_samples"][idx_95]
+    control_at_5 = results["control_samples"][idx_5]
+    control_at_50 = results["control_samples"][idx_50]
+    control_at_95 = results["control_samples"][idx_95]
     
     fig = go.Figure()
     
@@ -509,11 +509,11 @@ def create_uncertainty_grotta(results: dict, baseline_props: np.ndarray, labels:
     
     group_data = [
         (groups[0], treatment_at_95, 0.8),
-        (groups[1], baseline_at_95, 0.8),
+        (groups[1], control_at_95, 0.8),
         (groups[2], treatment_at_50, 1.0),
-        (groups[3], baseline_at_50, 1.0),
+        (groups[3], control_at_50, 1.0),
         (groups[4], treatment_at_5, 0.8),
-        (groups[5], baseline_at_5, 0.8),
+        (groups[5], control_at_5, 0.8),
     ]
     
     # Add stacked bars for each scenario
@@ -542,11 +542,11 @@ def create_uncertainty_grotta(results: dict, baseline_props: np.ndarray, labels:
     # Add annotations for walking independence
     walking_rates = {
         groups[0]: np.sum(treatment_at_95[:3]),
-        groups[1]: np.sum(baseline_at_95[:3]),
+        groups[1]: np.sum(control_at_95[:3]),
         groups[2]: np.sum(treatment_at_50[:3]),
-        groups[3]: np.sum(baseline_at_50[:3]),
+        groups[3]: np.sum(control_at_50[:3]),
         groups[4]: np.sum(treatment_at_5[:3]),
-        groups[5]: np.sum(baseline_at_5[:3]),
+        groups[5]: np.sum(control_at_5[:3]),
     }
     
     fig.update_layout(
@@ -598,9 +598,9 @@ def create_uncertainty_grotta(results: dict, baseline_props: np.ndarray, labels:
     return fig
 
 
-def create_uncertainty_grotta_simple(results: dict, baseline_props: np.ndarray, labels: list) -> go.Figure:
+def create_uncertainty_grotta_simple(results: dict, control_props: np.ndarray, labels: list) -> go.Figure:
     """
-    Create a simplified Grotta chart showing just baseline and treatment medians,
+    Create a simplified Grotta chart showing just control and treatment medians,
     with error bars indicating the 90% CI for each category.
     """
     colors = [
@@ -609,7 +609,7 @@ def create_uncertainty_grotta_simple(results: dict, baseline_props: np.ndarray, 
     ]
     
     # Calculate statistics
-    baseline_median = np.median(results["baseline_samples"], axis=0)
+    control_median = np.median(results["control_samples"], axis=0)
     treatment_median = np.median(results["treatment_proportions"], axis=0)
     treatment_5 = np.percentile(results["treatment_proportions"], 5, axis=0)
     treatment_95 = np.percentile(results["treatment_proportions"], 95, axis=0)
@@ -621,12 +621,12 @@ def create_uncertainty_grotta_simple(results: dict, baseline_props: np.ndarray, 
         subplot_titles=("IVIg Control (Reference)", "Treatment Arm (with 90% CI)")
     )
     
-    # Control arm (baseline median)
+    # Control arm (control median)
     cumulative = 0
     for i, label in enumerate(labels):
         fig.add_trace(
             go.Bar(
-                x=[baseline_median[i]],
+                x=[control_median[i]],
                 y=["Control"],
                 orientation='h',
                 name=label,
@@ -634,14 +634,14 @@ def create_uncertainty_grotta_simple(results: dict, baseline_props: np.ndarray, 
                 showlegend=True,
                 marker_color=colors[i],
                 marker_line=dict(color='white', width=1),
-                text=[f"{baseline_median[i]:.1f}%" if baseline_median[i] >= 5 else ""],
+                text=[f"{control_median[i]:.1f}%" if control_median[i] >= 5 else ""],
                 textposition='inside',
                 textfont=dict(color="white" if i in [0, 5] else "black", size=10),
                 hovertemplate=f"{label}: %{{x:.1f}}%<extra></extra>",
             ),
             row=1, col=1
         )
-        cumulative += baseline_median[i]
+        cumulative += control_median[i]
     
     # Treatment arm (with uncertainty)
     for i, label in enumerate(labels):
@@ -670,7 +670,7 @@ def create_uncertainty_grotta_simple(results: dict, baseline_props: np.ndarray, 
         )
     
     # Add vertical lines showing walking independence threshold position
-    control_walking = np.sum(baseline_median[:3])
+    control_walking = np.sum(control_median[:3])
     treatment_walking = np.sum(treatment_median[:3])
     treatment_walking_5 = np.sum(treatment_5[:3])
     treatment_walking_95 = np.sum(treatment_95[:3])
@@ -728,16 +728,16 @@ def main():
     
     st.header("🎲 Uncertainty Propagation")
     st.markdown("""
-    **Monte Carlo Simulation**: Explore how uncertainty in baseline distribution and odds ratio 
+    **Monte Carlo Simulation**: Explore how uncertainty in control arm distribution and odds ratio 
     propagates to outcome predictions. This helps assess confidence in trial projections.
     """)
     
-    # Check if baseline is available
-    if "baseline_props" not in st.session_state:
-        st.warning("⚠️ Please configure baseline proportions on the **Home** page first.")
+    # Check if control arm is available
+    if "control_props" not in st.session_state:
+        st.warning("⚠️ Please configure control arm proportions on the **Home** page first.")
         st.stop()
     
-    baseline_props = np.array(st.session_state.baseline_props)
+    control_props = np.array(st.session_state.control_props)
     
     st.divider()
     
@@ -766,14 +766,14 @@ def main():
         )
     
     with col2:
-        st.markdown("##### Baseline Uncertainty")
-        baseline_concentration = st.slider(
-            "Baseline Precision",
+        st.markdown("##### Control Arm Uncertainty")
+        control_concentration = st.slider(
+            "Control Precision",
             min_value=10.0,
             max_value=500.0,
             value=100.0,
             step=10.0,
-            help="Higher values = less variation around expected baseline. 100 = moderate uncertainty, 500 = high confidence"
+            help="Higher values = less variation around expected control arm. 100 = moderate uncertainty, 500 = high confidence"
         )
     
     with col3:
@@ -794,9 +794,9 @@ def main():
             np.random.seed(42)
             
             results = run_simulation(
-                baseline_props=baseline_props,
+                control_props=control_props,
                 expected_or=expected_or,
-                baseline_concentration=baseline_concentration,
+                control_concentration=control_concentration,
                 or_cv=or_cv,
                 n_simulations=n_simulations
             )
@@ -805,9 +805,9 @@ def main():
             st.session_state.mc_params = {
                 "expected_or": expected_or,
                 "or_cv": or_cv,
-                "baseline_concentration": baseline_concentration,
+                "control_concentration": control_concentration,
                 "n_simulations": n_simulations,
-                "baseline_props": baseline_props
+                "control_props": control_props
             }
     
     # Display results if available
@@ -933,7 +933,7 @@ def main():
             """)
             
             # Show the detailed uncertainty Grotta chart
-            fig_grotta = create_uncertainty_grotta(results, params["baseline_props"], labels)
+            fig_grotta = create_uncertainty_grotta(results, params["control_props"], labels)
             st.plotly_chart(fig_grotta, use_container_width=True)
             
             st.caption("""
@@ -958,13 +958,13 @@ def main():
             # Also show walking rates
             col1, col2 = st.columns(2)
             with col1:
-                fig_baseline = create_distribution_plot(
-                    results["baseline_walking"],
-                    "Baseline Walking Rate (Control)",
+                fig_control = create_distribution_plot(
+                    results["control_walking"],
+                    "Control Walking Rate",
                     "Walking Rate (%)",
                     "#00CC96"
                 )
-                st.plotly_chart(fig_baseline, use_container_width=True)
+                st.plotly_chart(fig_control, use_container_width=True)
             with col2:
                 fig_treatment = create_distribution_plot(
                     results["treatment_walking"],
@@ -985,12 +985,12 @@ def main():
             )
             st.plotly_chart(fig_or, use_container_width=True)
             
-            # Baseline samples visualization - show full distribution per level
-            st.markdown("##### Sampled Baseline Distributions")
-            st.markdown("Distribution of sampled baseline proportions for each GBS disability level:")
+            # Control samples visualization - show full distribution per level
+            st.markdown("##### Sampled Control Distributions")
+            st.markdown("Distribution of sampled control arm proportions for each GBS disability level:")
             
             # Create violin/box plot for each disability level
-            fig_baselines = go.Figure()
+            fig_controls = go.Figure()
             
             # Colors for each disability level
             level_colors = [
@@ -1004,9 +1004,9 @@ def main():
             
             # Add violin plot for each disability level
             for i, label in enumerate(labels):
-                level_samples = results["baseline_samples"][:, i]
+                level_samples = results["control_samples"][:, i]
                 
-                fig_baselines.add_trace(go.Violin(
+                fig_controls.add_trace(go.Violin(
                     x=[label] * len(level_samples),
                     y=level_samples,
                     name=label,
@@ -1019,18 +1019,18 @@ def main():
                     points=False,  # Don't show individual points for performance
                 ))
             
-            # Add expected baseline as scatter points with connecting line
-            fig_baselines.add_trace(go.Scatter(
+            # Add expected control as scatter points with connecting line
+            fig_controls.add_trace(go.Scatter(
                 x=labels,
-                y=params["baseline_props"],
+                y=params["control_props"],
                 mode='markers+lines',
-                name="Expected Baseline",
+                name="Expected Control",
                 marker=dict(size=14, color='red', symbol='diamond', line=dict(color='white', width=2)),
                 line=dict(color='red', width=3, dash='dash')
             ))
             
-            fig_baselines.update_layout(
-                title="Baseline Distribution Uncertainty per GBS Disability Level",
+            fig_controls.update_layout(
+                title="Control Distribution Uncertainty per GBS Disability Level",
                 xaxis_title="GBS Disability Level",
                 yaxis_title="Proportion (%)",
                 template="plotly_white",
@@ -1044,16 +1044,16 @@ def main():
                 ),
                 xaxis=dict(tickangle=-15)
             )
-            st.plotly_chart(fig_baselines, use_container_width=True)
+            st.plotly_chart(fig_controls, use_container_width=True)
             
             # Add summary statistics table
             st.markdown("##### Distribution Statistics per Level")
             stats_data = []
             for i, label in enumerate(labels):
-                level_samples = results["baseline_samples"][:, i]
+                level_samples = results["control_samples"][:, i]
                 stats_data.append({
                     "GBS Level": label,
-                    "Expected": f"{params['baseline_props'][i]:.1f}%",
+                    "Expected": f"{params['control_props'][i]:.1f}%",
                     "Median": f"{np.median(level_samples):.1f}%",
                     "5th %ile": f"{np.percentile(level_samples, 5):.1f}%",
                     "95th %ile": f"{np.percentile(level_samples, 95):.1f}%",
@@ -1065,7 +1065,7 @@ def main():
             st.markdown("#### Sensitivity Analysis")
             st.markdown("""
             These scatter plots help you understand which input drives more of the outcome uncertainty:
-            - **Left**: How does baseline severity affect the risk difference?
+            - **Left**: How does control arm severity affect the risk difference?
             - **Right**: How does the odds ratio affect the risk difference?
             """)
             
@@ -1073,16 +1073,16 @@ def main():
             st.plotly_chart(fig_scatter, use_container_width=True)
             
             # Correlation analysis
-            corr_baseline = np.corrcoef(results["baseline_walking"], results["risk_difference"])[0, 1]
+            corr_control = np.corrcoef(results["control_walking"], results["risk_difference"])[0, 1]
             corr_or = np.corrcoef(results["or_samples"][:len(results["risk_difference"])], results["risk_difference"])[0, 1]
             
             st.markdown("##### Correlation with Risk Difference")
             col1, col2 = st.columns(2)
-            col1.metric("Baseline Walking Rate", f"r = {corr_baseline:.3f}")
+            col1.metric("Control Walking Rate", f"r = {corr_control:.3f}")
             col2.metric("Odds Ratio", f"r = {corr_or:.3f}")
             
             # Interpretation
-            dominant = "Odds Ratio" if abs(corr_or) > abs(corr_baseline) else "Baseline Distribution"
+            dominant = "Odds Ratio" if abs(corr_or) > abs(corr_control) else "Control Distribution"
             st.info(f"**Insight**: {dominant} has a stronger influence on outcome uncertainty in this scenario.")
         
         with tab4:
@@ -1117,9 +1117,9 @@ def main():
             
             This simulation samples from probability distributions for both inputs:
             
-            **1. Baseline Distribution Uncertainty**
-            - Sampled from a **Dirichlet distribution** centered on your expected baseline
-            - Concentration parameter: **{params['baseline_concentration']:.0f}** (higher = less variation)
+            **1. Control Arm Distribution Uncertainty**
+            - Sampled from a **Dirichlet distribution** centered on your expected control arm
+            - Concentration parameter: **{params['control_concentration']:.0f}** (higher = less variation)
             - This reflects uncertainty in the true population distribution
             
             **2. Odds Ratio Uncertainty**
@@ -1129,7 +1129,7 @@ def main():
             
             **3. Simulation Process**
             - For each of **{params['n_simulations']:,}** iterations:
-              1. Sample a baseline distribution
+              1. Sample a control arm distribution
               2. Sample an odds ratio
               3. Apply proportional odds model to calculate treatment distribution
               4. Compute walking rate and risk difference

@@ -38,8 +38,8 @@ presets:
       - 8.0   # 5: Ventilated
     source: "Estimated"
 
-  igos_baseline:
-    name: "IGOS Registry Baseline"
+  igos_control:
+    name: "IGOS Registry Control"
     description: "Based on International GBS Outcome Study data"
     proportions:
       - 0.0   # 0: Healthy

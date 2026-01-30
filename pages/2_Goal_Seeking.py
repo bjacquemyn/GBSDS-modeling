@@ -34,20 +34,20 @@ def main():
     you need to detect based on clinically meaningful endpoints.
     """)
     
-    # Check if baseline is available in session state
-    if "baseline_props" not in st.session_state:
-        st.warning("⚠️ Please configure baseline proportions on the **Home** page first.")
+    # Check if control arm is available in session state
+    if "control_props" not in st.session_state:
+        st.warning("⚠️ Please configure control arm proportions on the **Home** page first.")
         st.stop()
     
-    baseline_props = st.session_state.baseline_props
+    control_props = st.session_state.control_props
     
     # Create model
-    model = ProportionalOddsModel(baseline_props)
+    model = ProportionalOddsModel(control_props)
     
-    # Show current baseline
+    # Show current control arm
     st.info(f"""
-    **Current Baseline (IVIg Control)**  
-    Walking Independent Rate (Score 0-2): **{model.baseline_walking_rate:.1f}%**
+    **Current Control Arm (IVIg)**  
+    Walking Independent Rate (Score 0-2): **{model.control_walking_rate:.1f}%**
     """)
     
     # Target input
@@ -65,7 +65,7 @@ def main():
         )
     
     with col2:
-        projected_rate = model.baseline_walking_rate + target_risk_diff
+        projected_rate = model.control_walking_rate + target_risk_diff
         st.metric(
             "Projected Walking Rate",
             f"{projected_rate:.1f}%",
@@ -114,7 +114,7 @@ def main():
     st.subheader("📊 Projected Outcome Distribution")
     chart = GrottaChart(labels)
     fig = chart.create_comparison(
-        baseline_props,
+        control_props,
         result.new_proportions,
         title=f"Goal: +{target_risk_diff:.0f}% Walking (Required OR = {required_or:.2f})"
     )
@@ -128,7 +128,7 @@ def main():
     """)
     
     # Calculate binary endpoint statistics
-    control_walking = sum(baseline_props[:3])  # Levels 0, 1, 2
+    control_walking = sum(control_props[:3])  # Levels 0, 1, 2
     treatment_walking = sum(result.new_proportions[:3])
     
     # Calculate odds for binary endpoint
@@ -179,21 +179,21 @@ def main():
         | Parameter | Value |
         |-----------|-------|
         | Required OR | {required_or:.3f} |
-        | Baseline Walking | {model.baseline_walking_rate:.1f}% |
+        | Control Walking | {model.control_walking_rate:.1f}% |
         | Expected in Treatment Arm | {result.new_walking:.1f}% |
         | Absolute Risk Difference | {result.risk_difference:.1f}% |
         | Number Needed to Treat (NNT) | {100/result.risk_difference:.1f} |
         
         **Sample Size Considerations:**
         - Larger effect sizes (higher OR) require smaller sample sizes
-        - Consider your confidence in the baseline assumptions
+        - Consider your confidence in the control arm assumptions
         - Factor in expected dropout rates
         """)
     
     st.divider()
     
     # Comparison Table
-    df = render_comparison_table(baseline_props, result.new_proportions, labels)
+    df = render_comparison_table(control_props, result.new_proportions, labels)
     
     st.divider()
     

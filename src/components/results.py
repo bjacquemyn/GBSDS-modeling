@@ -33,7 +33,7 @@ def render_metrics(result: ShiftResult, mode: str = "forward") -> None:
     
     col2.metric(
         "Walking Independent (Control)",
-        f"{result.baseline_walking:.1f}%",
+        f"{result.control_walking:.1f}%",
         help="GBS Score 0-2 in IVIg arm"
     )
     
@@ -48,7 +48,7 @@ def render_metrics(result: ShiftResult, mode: str = "forward") -> None:
 
 
 def render_comparison_table(
-    baseline_props: np.ndarray,
+    control_props: np.ndarray,
     new_props: np.ndarray,
     labels: list[str],
     odds_ratio: float = None
@@ -56,7 +56,7 @@ def render_comparison_table(
     """Render and return the detailed comparison table.
     
     Args:
-        baseline_props: Control group proportions (%).
+        control_props: Control group proportions (%).
         new_props: Treatment group proportions (%).
         labels: Category labels.
         odds_ratio: The odds ratio used (optional, for display).
@@ -67,7 +67,7 @@ def render_comparison_table(
     st.subheader("📋 Detailed Distribution Table")
     
     # Calculate cumulative percentages
-    baseline_cum = np.cumsum(baseline_props)
+    control_cum = np.cumsum(control_props)
     new_cum = np.cumsum(new_props)
     
     # Calculate odds: P(Y <= k) / P(Y > k)
@@ -82,25 +82,25 @@ def render_comparison_table(
                 odds.append(cp / (100.0 - cp))
         return odds
     
-    baseline_odds = calculate_odds(baseline_cum)
+    control_odds = calculate_odds(control_cum)
     new_odds = calculate_odds(new_cum)
     
     # Calculate odds ratio at each threshold
     calculated_or = []
-    for bo, no in zip(baseline_odds, new_odds):
-        if np.isnan(bo) or np.isnan(no) or bo == 0:
+    for co, no in zip(control_odds, new_odds):
+        if np.isnan(co) or np.isnan(no) or co == 0:
             calculated_or.append(np.nan)
         else:
-            calculated_or.append(no / bo)
+            calculated_or.append(no / co)
     
     df = pd.DataFrame({
         "Category": labels,
-        "Control %": baseline_props,
+        "Control %": control_props,
         "Treatment %": new_props,
-        "Δ %": new_props - baseline_props,
-        "Cum. Control %": baseline_cum,
+        "Δ %": new_props - control_props,
+        "Cum. Control %": control_cum,
         "Cum. Treatment %": new_cum,
-        "Odds (Control)": baseline_odds,
+        "Odds (Control)": control_odds,
         "Odds (Treatment)": new_odds,
         "Odds Ratio": calculated_or
     })

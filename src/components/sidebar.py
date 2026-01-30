@@ -1,4 +1,4 @@
-"""Sidebar component for baseline configuration."""
+"""Sidebar component for control arm configuration."""
 
 import streamlit as st
 import numpy as np
@@ -67,11 +67,11 @@ def load_settings(config_path: Optional[Path] = None) -> dict:
         }
 
 
-def render_baseline_sidebar() -> np.ndarray:
-    """Render the baseline configuration sidebar.
+def render_control_sidebar() -> np.ndarray:
+    """Render the control arm configuration sidebar.
     
     Returns:
-        NumPy array of baseline proportions (percentages).
+        NumPy array of control arm proportions (percentages).
     """
     settings = load_settings()
     presets_config = load_presets()
@@ -84,7 +84,7 @@ def render_baseline_sidebar() -> np.ndarray:
     presets = presets_config.get("presets", {})
     default_preset_key = presets_config.get("default_preset", "severe_gbs")
     
-    st.sidebar.header("📊 Baseline Configuration")
+    st.sidebar.header("📊 Control Arm Configuration")
     st.sidebar.markdown("Configure the IVIg (Control) arm distribution.")
     
     # Preset selector
@@ -118,19 +118,19 @@ def render_baseline_sidebar() -> np.ndarray:
         preset_data = presets.get(preset_key, {})
         default_props = preset_data.get("proportions", [0, 4, 4, 16, 43, 33])
         
-        # When preset changes, update the session state for each baseline widget
+        # When preset changes, update the session state for each control widget
         # This is necessary because Streamlit caches widget values by key
         if preset_changed:
             for i, val in enumerate(default_props):
-                st.session_state[f"baseline_{i}"] = float(val)
+                st.session_state[f"control_{i}"] = float(val)
         
         # Show preset description
         if "description" in preset_data:
             st.sidebar.info(preset_data["description"])
     else:
         # Use session state or defaults for custom
-        if "custom_baseline" in st.session_state:
-            default_props = st.session_state.custom_baseline
+        if "custom_control" in st.session_state:
+            default_props = st.session_state.custom_control
         else:
             default_props = [0.0, 4.0, 4.0, 16.0, 43.0, 33.0]
     
@@ -138,7 +138,7 @@ def render_baseline_sidebar() -> np.ndarray:
     st.sidebar.subheader("Manual Adjustment")
     
     # Individual category inputs
-    baseline_inputs = []
+    control_inputs = []
     for i, label in enumerate(labels):
         val = st.sidebar.number_input(
             f"{label} (%)",
@@ -146,15 +146,15 @@ def render_baseline_sidebar() -> np.ndarray:
             max_value=100.0,
             value=float(default_props[i]),
             step=1.0,
-            key=f"baseline_{i}"
+            key=f"control_{i}"
         )
-        baseline_inputs.append(val)
+        control_inputs.append(val)
     
     # Store custom values
-    st.session_state.custom_baseline = baseline_inputs
+    st.session_state.custom_control = control_inputs
     
     # Validation
-    total_pct = sum(baseline_inputs)
+    total_pct = sum(control_inputs)
     
     st.sidebar.divider()
     if 99.9 <= total_pct <= 100.1:
@@ -164,11 +164,11 @@ def render_baseline_sidebar() -> np.ndarray:
         st.stop()
     
     # Calculate and display walking rate
-    walking_rate = sum(baseline_inputs[:3])
+    walking_rate = sum(control_inputs[:3])
     st.sidebar.metric(
-        "Baseline Walking Rate",
+        "Control Walking Rate",
         f"{walking_rate:.1f}%",
         help="Percentage with GBS Score 0-2 (walking independent)"
     )
     
-    return np.array(baseline_inputs)
+    return np.array(control_inputs)

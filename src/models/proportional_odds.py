@@ -17,13 +17,13 @@ class ShiftResult:
     Attributes:
         new_proportions: Array of new category proportions (percentages).
         odds_ratio: The odds ratio used for the shift.
-        baseline_walking: Baseline walking independence rate (%).
+        control_walking: Control arm walking independence rate (%).
         new_walking: New walking independence rate (%).
         risk_difference: Absolute difference in walking rates (%).
     """
     new_proportions: np.ndarray
     odds_ratio: float
-    baseline_walking: float
+    control_walking: float
     new_walking: float
     risk_difference: float
 
@@ -35,48 +35,48 @@ class ProportionalOddsModel:
     across all cumulative probability thresholds of an ordinal outcome.
     
     Attributes:
-        baseline_proportions: Baseline category proportions (percentages).
+        control_proportions: Control arm category proportions (percentages).
         walking_cutoff: Maximum score considered "walking independent" (default: 2).
     """
     
     def __init__(
         self, 
-        baseline_proportions: np.ndarray,
+        control_proportions: np.ndarray,
         walking_cutoff: int = 2
     ):
-        """Initialize the model with baseline proportions.
+        """Initialize the model with control arm proportions.
         
         Args:
-            baseline_proportions: Array of percentages for each disability category.
+            control_proportions: Array of percentages for each disability category.
                                   Must sum to 100.
             walking_cutoff: Maximum GBS score considered as walking independent.
         
         Raises:
             ValueError: If proportions don't sum to ~100 or contain invalid values.
         """
-        self.baseline_proportions = np.array(baseline_proportions, dtype=float)
+        self.control_proportions = np.array(control_proportions, dtype=float)
         self.walking_cutoff = walking_cutoff
         self._validate()
     
     def _validate(self) -> None:
-        """Validate baseline proportions."""
-        total = np.sum(self.baseline_proportions)
+        """Validate control arm proportions."""
+        total = np.sum(self.control_proportions)
         if not (99.9 <= total <= 100.1):
             raise ValueError(f"Proportions must sum to 100, got {total:.1f}")
-        if np.any(self.baseline_proportions < 0):
+        if np.any(self.control_proportions < 0):
             raise ValueError("Proportions cannot be negative")
-        if np.any(self.baseline_proportions > 100):
+        if np.any(self.control_proportions > 100):
             raise ValueError("Individual proportions cannot exceed 100")
     
     @property
-    def baseline_probs(self) -> np.ndarray:
-        """Baseline proportions as probabilities (0-1)."""
-        return self.baseline_proportions / 100.0
+    def control_probs(self) -> np.ndarray:
+        """Control arm proportions as probabilities (0-1)."""
+        return self.control_proportions / 100.0
     
     @property
-    def baseline_walking_rate(self) -> float:
-        """Baseline walking independence rate (percentage)."""
-        return float(np.sum(self.baseline_proportions[:self.walking_cutoff + 1]))
+    def control_walking_rate(self) -> float:
+        """Control arm walking independence rate (percentage)."""
+        return float(np.sum(self.control_proportions[:self.walking_cutoff + 1]))
     
     def calculate_shift(self, odds_ratio: float) -> ShiftResult:
         """Calculate the shifted distribution given an odds ratio.
@@ -92,13 +92,13 @@ class ProportionalOddsModel:
             ShiftResult containing new proportions and summary statistics.
         """
         # Calculate cumulative probabilities P(Y <= k)
-        cum_probs = np.cumsum(self.baseline_probs)
+        cum_probs = np.cumsum(self.control_probs)
         cum_probs[-1] = 1.0  # Handle precision
         
         new_cum_probs = []
         
         # Apply OR to each cumulative threshold (except last which stays 1.0)
-        for i in range(len(self.baseline_probs) - 1):
+        for i in range(len(self.control_probs) - 1):
             cp = cum_probs[i]
             
             if cp >= 1.0 or cp <= 0.0:
@@ -124,9 +124,9 @@ class ProportionalOddsModel:
         return ShiftResult(
             new_proportions=new_props,
             odds_ratio=odds_ratio,
-            baseline_walking=self.baseline_walking_rate,
+            control_walking=self.control_walking_rate,
             new_walking=new_walking,
-            risk_difference=new_walking - self.baseline_walking_rate
+            risk_difference=new_walking - self.control_walking_rate
         )
     
     def find_or_for_target(
@@ -147,17 +147,17 @@ class ProportionalOddsModel:
         if cutoff_idx is None:
             cutoff_idx = self.walking_cutoff
         
-        baseline_cum_prob = np.sum(self.baseline_probs[:cutoff_idx + 1])
-        target_cum_prob = baseline_cum_prob + target_risk_difference
+        control_cum_prob = np.sum(self.control_probs[:cutoff_idx + 1])
+        target_cum_prob = control_cum_prob + target_risk_difference
         
         # Clamp to valid probability range
         target_cum_prob = np.clip(target_cum_prob, 0.001, 0.999)
         
         # Calculate odds
-        baseline_odds = baseline_cum_prob / (1.0 - baseline_cum_prob)
+        control_odds = control_cum_prob / (1.0 - control_cum_prob)
         target_odds = target_cum_prob / (1.0 - target_cum_prob)
         
-        if baseline_odds == 0:
+        if control_odds == 0:
             return 1.0
         
-        return target_odds / baseline_odds
+        return target_odds / control_odds

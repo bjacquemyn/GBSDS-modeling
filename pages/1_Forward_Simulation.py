@@ -34,12 +34,12 @@ def main():
     the potential impact on patient outcomes.
     """)
     
-    # Check if baseline is available in session state
-    if "baseline_props" not in st.session_state:
-        st.warning("⚠️ Please configure baseline proportions on the **Home** page first.")
+    # Check if control arm is available in session state
+    if "control_props" not in st.session_state:
+        st.warning("⚠️ Please configure control arm proportions on the **Home** page first.")
         st.stop()
     
-    baseline_props = st.session_state.baseline_props
+    control_props = st.session_state.control_props
     
     # OR Slider
     st.subheader("Treatment Effect (Odds Ratio)")
@@ -65,7 +65,7 @@ def main():
             st.info("OR 1.00 → No change")
     
     # Calculate shift
-    model = ProportionalOddsModel(baseline_props)
+    model = ProportionalOddsModel(control_props)
     result = model.calculate_shift(odds_ratio)
     
     st.divider()
@@ -79,7 +79,7 @@ def main():
     st.subheader("📊 Outcome Distribution Comparison")
     chart = GrottaChart(labels)
     fig = chart.create_comparison(
-        baseline_props,
+        control_props,
         result.new_proportions,
         title=f"GBS Disability Outcomes: OR = {odds_ratio:.2f}"
     )
@@ -93,7 +93,7 @@ def main():
     """)
     
     # Calculate binary endpoint statistics
-    control_walking = sum(baseline_props[:3])  # Levels 0, 1, 2
+    control_walking = sum(control_props[:3])  # Levels 0, 1, 2
     treatment_walking = sum(result.new_proportions[:3])
     
     # Calculate odds for binary endpoint
@@ -153,7 +153,7 @@ def main():
     st.divider()
     
     # Comparison Table
-    df = render_comparison_table(baseline_props, result.new_proportions, labels)
+    df = render_comparison_table(control_props, result.new_proportions, labels)
     
     st.divider()
     

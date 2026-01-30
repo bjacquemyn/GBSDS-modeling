@@ -2,7 +2,7 @@
 GBS Clinical Trial Outcome Modeler
 
 Main application entry point. This serves as the home page and
-initializes the baseline configuration for other pages.
+initializes the control arm configuration for other pages.
 """
 
 import streamlit as st
@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.models import ProportionalOddsModel
 from src.visualization import GrottaChart
-from src.components.sidebar import render_baseline_sidebar, load_settings
+from src.components.sidebar import render_control_sidebar, load_settings
 
 
 def main():
@@ -36,11 +36,11 @@ def main():
     st.title("🧬 " + app_config.get("title", "GBS Clinical Trial Outcome Modeler"))
     st.markdown(app_config.get("subtitle", "Dynamic modeling using the Proportional Odds Model"))
     
-    # Sidebar: Baseline configuration
-    baseline_props = render_baseline_sidebar()
+    # Sidebar: Control arm configuration
+    control_props = render_control_sidebar()
     
     # Store in session state for other pages
-    st.session_state.baseline_props = baseline_props
+    st.session_state.control_props = control_props
     
     # Main content
     st.header("📋 Overview")
@@ -51,38 +51,38 @@ def main():
     
     ### How to Use This Tool
     
-    1. **Configure Baseline** (sidebar): Set the expected disability distribution 
+    1. **Configure Control Arm** (sidebar): Set the expected disability distribution 
        in the IVIg control arm
     2. **Choose Your Approach**:
        - **Forward Simulation**: Explore different odds ratios to see outcome shifts
        - **Goal Seeking**: Define a target improvement and find the required efficacy
     """)
     
-    # Quick preview of current baseline
-    st.subheader("Current Baseline Configuration")
+    # Quick preview of current control arm
+    st.subheader("Current Control Arm Configuration")
     
     labels = settings.get("disability_scale", {}).get("labels", [
         "0: Healthy", "1: Minor Symptoms", "2: Walk Independent",
         "3: Walk Assisted", "4: Bedridden", "5: Ventilated"
     ])
     
-    # Show baseline distribution
+    # Show control arm distribution
     chart = GrottaChart(labels)
     fig = chart.create_single(
-        baseline_props,
+        control_props,
         "IVIg (Control Arm)",
-        "Baseline Disability Distribution"
+        "Control Arm Disability Distribution"
     )
     st.plotly_chart(fig, use_container_width=True)
     
     # Summary statistics
-    model = ProportionalOddsModel(baseline_props)
+    model = ProportionalOddsModel(control_props)
     
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Walking Independent", f"{model.baseline_walking_rate:.1f}%", help="Score 0-2")
-    col2.metric("Walk Assisted", f"{baseline_props[3]:.1f}%", help="Score 3")
-    col3.metric("Bedridden", f"{baseline_props[4]:.1f}%", help="Score 4")
-    col4.metric("Ventilated", f"{baseline_props[5]:.1f}%", help="Score 5")
+    col1.metric("Walking Independent", f"{model.control_walking_rate:.1f}%", help="Score 0-2")
+    col2.metric("Walk Assisted", f"{control_props[3]:.1f}%", help="Score 3")
+    col3.metric("Bedridden", f"{control_props[4]:.1f}%", help="Score 4")
+    col4.metric("Ventilated", f"{control_props[5]:.1f}%", help="Score 5")
     
     st.divider()
     
